@@ -63,18 +63,65 @@ jobs:
           echo "Downloaded AdGuard DNS filter:"
           wc -l build/adguard-filter.txt
 
-      - name: Generate Ad-Domain.list
+      - name: Generate AdGuard-DNS-Domain.list
         run: |
           python scripts/convert_adguard.py \
             build/adguard-filter.txt \
-            rules/AdGuard/Ad-Domain.list
+            build/AdGuard-DNS-Domain.list
+
+          if [ ! -s build/AdGuard-DNS-Domain.list ]; then
+            echo "Error: AdGuard-DNS-Domain.list is empty."
+            exit 1
+          fi
+
+          echo "Generated AdGuard DNS domain rules:"
+          wc -l build/AdGuard-DNS-Domain.list
+
+      - name: Download EasyList AdServers
+        run: |
+          curl \
+            --fail \
+            --location \
+            --retry 3 \
+            --retry-delay 5 \
+            --output build/easylist-adservers.txt \
+            https://raw.githubusercontent.com/easylist/easylist/master/easylist/easylist_adservers.txt
+
+          if [ ! -s build/easylist-adservers.txt ]; then
+            echo "Error: downloaded EasyList AdServers list is empty."
+            exit 1
+          fi
+
+          echo "Downloaded EasyList AdServers list:"
+          wc -l build/easylist-adservers.txt
+
+      - name: Generate EasyList-Adservers-Domain.list
+        run: |
+          python scripts/convert_adguard.py \
+            build/easylist-adservers.txt \
+            build/EasyList-Adservers-Domain.list
+
+          if [ ! -s build/EasyList-Adservers-Domain.list ]; then
+            echo "Error: EasyList-Adservers-Domain.list is empty."
+            exit 1
+          fi
+
+          echo "Generated EasyList AdServers domain rules:"
+          wc -l build/EasyList-Adservers-Domain.list
+
+      - name: Merge and dedupe Ad-Domain.list
+        run: |
+          sort -u \
+            build/AdGuard-DNS-Domain.list \
+            build/EasyList-Adservers-Domain.list \
+            -o rules/AdGuard/Ad-Domain.list
 
           if [ ! -s rules/AdGuard/Ad-Domain.list ]; then
             echo "Error: Ad-Domain.list is empty."
             exit 1
           fi
 
-          echo "Generated AdGuard domain rules:"
+          echo "Generated merged AdGuard domain rules:"
           wc -l rules/AdGuard/Ad-Domain.list
 
       # =========================
