@@ -1,0 +1,106 @@
+name: Update Shadowrocket Rules
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+      timezone: "Asia/Taipei"
+    - cron: "43 5 * * *"
+      timezone: "Asia/Taipei"
+
+  # Allow manual
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-shadowrocket-rules
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Prepare build directory
+        run: |
+          mkdir -p build
+
+      # Tests run before any rule generation.  A semantic regression must stop
+      # the workflow before tracked output files can be changed or committed.
+      - name: Run converter tests
+        run: |
+          python -m unittest discover -s tests -v
+
+      # =========================
+      # AdGuard DNS Filter
+      # =========================
+
+      - name: Download AdGuard DNS Filter
+        run: |
+          curl \
+            --fail \
+            --location \
+            --retry 3 \
+            --retry-delay 5 \
+            --output build/adguard-filter.txt \
+            https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
+
+          if [ ! -s build/adguard-filter.txt ]; then
+            echo "Error: downloaded AdGuard DNS filter is empty."
+            exit 1
+          fi
+
+          echo "Downloaded AdGuard DNS filter:"
+          wc -l build/adguard-filter.txt
+
+      - name: Generate Ad-Domain.list
+        run: |
+          python scripts/convert_adguard.py \
+            build/adguard-filter.txt \
+            rules/AdGuard/Ad-Domain.list
+
+          if [ ! -s rules/AdGuard/Ad-Domain.list ]; then
+            echo "Error: Ad-Domain.list is empty."
+            exit 1
+          fi
+
+          echo "Generated AdGuard domain rules:"
+          wc -l rules/AdGuard/Ad-Domain.list
+
+      # =========================
+      # Show changes
+      # =========================
+
+      - name: Show changes
+        run: |
+          git status --short
+          git diff --stat || true
+
+      # =========================
+      # Commit
+      # =========================
+
+      - name: Commit updated rules
+        run: |
+          git add -A -- rules/
+
+          if git diff --cached --quiet; then
+            echo "No rule changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit -m "Update Shadowrocket rules"
+          git push
