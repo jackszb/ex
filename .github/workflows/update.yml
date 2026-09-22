@@ -121,6 +121,11 @@ jobs:
             exit 1
           fi
 
+          echo "AdGuard DNS source rules: $(wc -l < build/AdGuard-DNS-Domain.list)"
+          echo "EasyList AdServers source rules: $(wc -l < build/EasyList-Adservers-Domain.list)"
+          echo "New rules contributed only by EasyList: $(comm -13 \
+            <(sort build/AdGuard-DNS-Domain.list) \
+            <(sort build/EasyList-Adservers-Domain.list) | wc -l)"
           echo "Generated merged AdGuard domain rules:"
           wc -l rules/AdGuard/Ad-Domain.list
 
